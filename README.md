@@ -1,4 +1,4 @@
-* Setup needed requirements into your env `pip install requirements.txt`
+* Setup needed requirements into your env `pip install -r requirements.txt`
 * Add your code in `src/main/`
 * Test your code with `src/tests/`
 * Package your artifacts
