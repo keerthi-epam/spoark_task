@@ -3,6 +3,7 @@ FROM openjdk:8-alpine
 
 ARG SPARK_VERSION_ARG=3.1.2
 ARG HADOOP_VERSION=3.3.0
+ARG PYTHON_VERSION=3.9
 
 ENV BASE_IMAGE      openjdk:8-alpine
 ENV SPARK_VERSION   $SPARK_VERSION_ARG
@@ -45,18 +46,16 @@ RUN wget -O $SPARK_HOME/jars/azure-keyvault-core-1.0.0.jar https://repo1.maven.o
 
 RUN wget -O $SPARK_HOME/jars/azure-keyvault-core-1.0.0.jar https://repo1.maven.org/maven2/ch/hsr/geohash/1.4.0/geohash-1.4.0.jar
 
-COPY entrypoint.sh /opt/
-#COPY ../target/sparkbasics-1.0.0.jar $SPARK_HOME/jars/
-
+COPY ./docker/entrypoint.sh /opt/
+COPY ./dist/sparkbasics-1.0.0-py${PYTHON_VERSION}.egg /opt/
 
 RUN chmod +x /opt/*.sh
 
 RUN apk update && \
     apk add --no-cache python3 py3-pip && \
-    pip3 install --upgrade pip setuptools && \
+    pip3 install --upgrade pip setuptools pygeohash requests && \
     # Removed the .cache to save space
     rm -r /root/.cache && rm -rf /var/cache/apk/*
-
 
 WORKDIR /opt/spark/work-dir
 ENTRYPOINT [ "/opt/entrypoint.sh" ]
