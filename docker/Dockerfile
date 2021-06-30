@@ -44,8 +44,8 @@ RUN wget -O $SPARK_HOME/jars/azure-data-lake-store-sdk-2.3.6.jar https://repo1.m
 RUN wget -O $SPARK_HOME/jars/azure-keyvault-core-1.0.0.jar https://repo1.maven.org/maven2/com/microsoft/azure/azure-keyvault-core/1.0.0/azure-keyvault-core-1.0.0.jar
 RUN wget -O $SPARK_HOME/jars/azure-keyvault-core-1.0.0.jar https://repo1.maven.org/maven2/ch/hsr/geohash/1.4.0/geohash-1.4.0.jar
 
-COPY ./entrypoint.sh /opt/
-COPY ../dist/sparkbasics-*.egg /opt/
+COPY ./docker/entrypoint.sh /opt/
+COPY ./dist/sparkbasics-*.egg /opt/
 
 RUN chmod +x /opt/*.sh
 
