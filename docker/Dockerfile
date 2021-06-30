@@ -3,7 +3,6 @@ FROM openjdk:8-alpine
 
 ARG SPARK_VERSION_ARG=3.1.2
 ARG HADOOP_VERSION=3.3.0
-ARG PYTHON_VERSION=3.9
 
 ENV BASE_IMAGE      openjdk:8-alpine
 ENV SPARK_VERSION   $SPARK_VERSION_ARG
@@ -43,11 +42,10 @@ RUN wget -O $SPARK_HOME/jars/hadoop-azure-datalake-${HADOOP_VERSION}.jar https:/
 RUN wget -O $SPARK_HOME/jars/azure-storage-7.0.0.jar https://repo1.maven.org/maven2/com/microsoft/azure/azure-storage/7.0.0/azure-storage-7.0.0.jar
 RUN wget -O $SPARK_HOME/jars/azure-data-lake-store-sdk-2.3.6.jar https://repo1.maven.org/maven2/com/microsoft/azure/azure-data-lake-store-sdk/2.3.6/azure-data-lake-store-sdk-2.3.6.jar
 RUN wget -O $SPARK_HOME/jars/azure-keyvault-core-1.0.0.jar https://repo1.maven.org/maven2/com/microsoft/azure/azure-keyvault-core/1.0.0/azure-keyvault-core-1.0.0.jar
-
 RUN wget -O $SPARK_HOME/jars/azure-keyvault-core-1.0.0.jar https://repo1.maven.org/maven2/ch/hsr/geohash/1.4.0/geohash-1.4.0.jar
 
-COPY ./docker/entrypoint.sh /opt/
-COPY ./dist/sparkbasics-1.0.0-py${PYTHON_VERSION}.egg /opt/
+COPY ./entrypoint.sh /opt/
+COPY ../dist/sparkbasics-*.egg /opt/
 
 RUN chmod +x /opt/*.sh
 
@@ -55,7 +53,7 @@ RUN apk update && \
     apk add --no-cache python3 py3-pip && \
     pip3 install --upgrade pip setuptools pygeohash requests && \
     # Removed the .cache to save space
-    rm -r /root/.cache && rm -rf /var/cache/apk/*
+    rm -rf /var/cache/apk/*
 
 WORKDIR /opt/spark/work-dir
 ENTRYPOINT [ "/opt/entrypoint.sh" ]
