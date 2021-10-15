@@ -1,9 +1,6 @@
+# Setup azurerm as a state backend
 terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~>2.81.0"
-    }
+  backend "azurerm" {
   }
 }
 
