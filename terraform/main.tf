@@ -1,12 +1,15 @@
 terraform {
-  backend "azurerm" {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~>2.81.0"
+    }
   }
 }
 
+# Configure the Microsoft Azure Provider
 provider "azurerm" {
-  version = "~> 2.62.0"
-  features {
-  }
+  features {}
 }
 
 data "azurerm_client_config" "current" {}
@@ -94,5 +97,6 @@ output "client_certificate" {
 }
 
 output "kube_config" {
+  sensitive = true
   value = azurerm_kubernetes_cluster.bdcc.kube_config_raw
 }
