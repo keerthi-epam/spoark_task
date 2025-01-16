@@ -1,6 +1,10 @@
 # Setup azurerm as a state backend
 terraform {
   backend "azurerm" {
+    resource_group_name  = ""
+    storage_account_name = "" # Provide Storage Account name, where Terraform Remote state is stored
+    container_name       = ""
+    key                  = "bdcc.tfstate"
   }
 }
 
@@ -12,7 +16,7 @@ provider "azurerm" {
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_resource_group" "bdcc" {
-  name = "rg-${var.ENV}-${var.LOCATION}"
+  name     = "rg-${var.ENV}-${var.LOCATION}"
   location = var.LOCATION
 
   lifecycle {
@@ -21,24 +25,24 @@ resource "azurerm_resource_group" "bdcc" {
 
   tags = {
     region = var.BDCC_REGION
-    env = var.ENV
+    env    = var.ENV
   }
 }
 
 resource "azurerm_storage_account" "bdcc" {
   depends_on = [
-    azurerm_resource_group.bdcc]
+  azurerm_resource_group.bdcc]
 
-  name = "st${var.ENV}${var.LOCATION}"
-  resource_group_name = azurerm_resource_group.bdcc.name
-  location = azurerm_resource_group.bdcc.location
-  account_tier = "Standard"
+  name                     = "st${var.ENV}${var.LOCATION}"
+  resource_group_name      = azurerm_resource_group.bdcc.name
+  location                 = azurerm_resource_group.bdcc.location
+  account_tier             = "Standard"
   account_replication_type = var.STORAGE_ACCOUNT_REPLICATION_TYPE
-  is_hns_enabled = "true"
+  is_hns_enabled           = "true"
 
   network_rules {
     default_action = "Allow"
-    ip_rules = values(var.IP_RULES)
+    ip_rules       = values(var.IP_RULES)
   }
 
   lifecycle {
@@ -47,15 +51,15 @@ resource "azurerm_storage_account" "bdcc" {
 
   tags = {
     region = var.BDCC_REGION
-    env = var.ENV
+    env    = var.ENV
   }
 }
 
 resource "azurerm_storage_data_lake_gen2_filesystem" "gen2_data" {
   depends_on = [
-    azurerm_storage_account.bdcc]
+  azurerm_storage_account.bdcc]
 
-  name = "data"
+  name               = "data"
   storage_account_id = azurerm_storage_account.bdcc.id
 
   lifecycle {
@@ -66,7 +70,7 @@ resource "azurerm_storage_data_lake_gen2_filesystem" "gen2_data" {
 
 resource "azurerm_kubernetes_cluster" "bdcc" {
   depends_on = [
-    azurerm_resource_group.bdcc]
+  azurerm_resource_group.bdcc]
 
   name                = "aks-${var.ENV}-${var.LOCATION}"
   location            = azurerm_resource_group.bdcc.location
@@ -85,7 +89,7 @@ resource "azurerm_kubernetes_cluster" "bdcc" {
 
   tags = {
     region = var.BDCC_REGION
-    env = var.ENV
+    env    = var.ENV
   }
 }
 
@@ -95,5 +99,5 @@ output "client_certificate" {
 
 output "kube_config" {
   sensitive = true
-  value = azurerm_kubernetes_cluster.bdcc.kube_config_raw
+  value     = azurerm_kubernetes_cluster.bdcc.kube_config_raw
 }
