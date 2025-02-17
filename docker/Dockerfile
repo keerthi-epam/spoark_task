@@ -1,63 +1,68 @@
-#Modify this docker for your needs
-FROM openjdk:8-alpine
+# Use Ubuntu as the base image for better compatibility
+FROM ubuntu:22.04
 
-ARG SPARK_VERSION_ARG=3.1.2
-ARG HADOOP_VERSION=3.3.1
+# Define build arguments
+ARG SPARK_VERSION=3.5.0
+ARG HADOOP_VERSION=3.3.6
+ARG SPARK_UID=185
 
-ENV BASE_IMAGE      openjdk:8-alpine
-ENV SPARK_VERSION   $SPARK_VERSION_ARG
-
-ENV SPARK_HOME      /opt/spark
-ENV HADOOP_HOME     /opt/hadoop
-ENV PATH            $PATH:$SPARK_HOME/bin
-
-RUN set -ex && \
-    apk upgrade --no-cache && \
-    apk --update add --no-cache bash tini libstdc++ glib gcompat libc6-compat linux-pam krb5 krb5-libs nss openssl wget sed curl && \
-    rm /bin/sh && \
-    ln -sv /bin/bash /bin/sh && \
-    echo "auth required pam_wheel.so use_uid" >> /etc/pam.d/su && \
-    chgrp root /etc/passwd && chmod ug+rw /etc/passwd && \
-    # Removed the .cache to save space
-    rm -rf /root/.cache && rm -rf /var/cache/apk/*
-
-RUN wget -O /spark-${SPARK_VERSION}-bin-without-hadoop.tgz https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-without-hadoop.tgz && \
-    tar -xzf /spark-${SPARK_VERSION}-bin-without-hadoop.tgz -C /opt/ && \
-    ln -s /opt/spark-${SPARK_VERSION}-bin-without-hadoop $SPARK_HOME && \
-    rm -f /spark-${SPARK_VERSION}-bin-without-hadoop.tgz && \
-    mkdir -p $SPARK_HOME/work-dir && \
-    mkdir -p $SPARK_HOME/spark-warehouse
-
-RUN wget -O /hadoop-${HADOOP_VERSION}.tar.gz https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz && \
-    tar -xzf /hadoop-${HADOOP_VERSION}.tar.gz -C /opt/ && \
-    ln -s /opt/hadoop-${HADOOP_VERSION} $HADOOP_HOME && \
-    rm -f /hadoop-${HADOOP_VERSION}.tar.gz
-
+# Set environment variables
+ENV SPARK_HOME=/opt/spark
+ENV HADOOP_HOME=/opt/hadoop
 ENV PATH="$SPARK_HOME/bin:$HADOOP_HOME/bin:$PATH"
-ENV SPARK_DIST_CLASSPATH $HADOOP_HOME/etc/hadoop:$HADOOP_HOME/share/hadoop/common/lib/*:$HADOOP_HOME/share/hadoop/common/*:$HADOOP_HOME/share/hadoop/hdfs:$HADOOP_HOME/share/hadoop/hdfs/lib/*:$HADOOP_HOME/share/hadoop/hdfs/*:$HADOOP_HOME/share/hadoop/mapreduce/*:$HADOOP_HOME/share/hadoop/yarn:$HADOOP_HOME/share/hadoop/yarn/lib/*:$HADOOP_HOME/share/hadoop/yarn/*:$HADOOP_HOME/share/hadoop/tools/lib/*
-ENV SPARK_CLASSPATH $HADOOP_HOME/etc/hadoop:$HADOOP_HOME/share/hadoop/common/lib/*:$HADOOP_HOME/share/hadoop/common/*:$HADOOP_HOME/share/hadoop/hdfs:$HADOOP_HOME/share/hadoop/hdfs/lib/*:$HADOOP_HOME/share/hadoop/hdfs/*:$HADOOP_HOME/share/hadoop/mapreduce/*:$HADOOP_HOME/share/hadoop/yarn:$HADOOP_HOME/share/hadoop/yarn/lib/*:$HADOOP_HOME/share/hadoop/yarn/*:$HADOOP_HOME/share/hadoop/tools/lib/*
+ENV PYTHONUNBUFFERED=1
 
-RUN wget -O $SPARK_HOME/jars/hadoop-azure-${HADOOP_VERSION}.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-azure/${HADOOP_VERSION}/hadoop-azure-${HADOOP_VERSION}.jar
-RUN wget -O $SPARK_HOME/jars/hadoop-azure-datalake-${HADOOP_VERSION}.jar https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-azure-datalake/${HADOOP_VERSION}/hadoop-azure-datalake-${HADOOP_VERSION}.jar
-RUN wget -O $SPARK_HOME/jars/azure-storage-7.0.0.jar https://repo1.maven.org/maven2/com/microsoft/azure/azure-storage/7.0.0/azure-storage-7.0.0.jar
-RUN wget -O $SPARK_HOME/jars/azure-data-lake-store-sdk-2.3.6.jar https://repo1.maven.org/maven2/com/microsoft/azure/azure-data-lake-store-sdk/2.3.6/azure-data-lake-store-sdk-2.3.6.jar
-RUN wget -O $SPARK_HOME/jars/azure-keyvault-core-1.0.0.jar https://repo1.maven.org/maven2/com/microsoft/azure/azure-keyvault-core/1.0.0/azure-keyvault-core-1.0.0.jar
-RUN wget -O $SPARK_HOME/jars/azure-keyvault-core-1.0.0.jar https://repo1.maven.org/maven2/ch/hsr/geohash/1.4.0/geohash-1.4.0.jar
+# Install system dependencies and Python 3
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    bash curl wget openjdk-11-jdk libstdc++6 glibc-source krb5-user libnss3 tini python3 python3-pip python3-setuptools \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY ./docker/entrypoint.sh /opt/
+# Ensure Python3 is the default
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+# Download and install Apache Spark
+RUN wget -O /tmp/spark-${SPARK_VERSION}-bin-without-hadoop.tgz \
+    "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-without-hadoop.tgz" && \
+    tar -xzf /tmp/spark-${SPARK_VERSION}-bin-without-hadoop.tgz -C /opt/ && \
+    ln -s /opt/spark-${SPARK_VERSION}-bin-without-hadoop ${SPARK_HOME} && \
+    rm -f /tmp/spark-${SPARK_VERSION}-bin-without-hadoop.tgz
+
+# Download and install Hadoop
+RUN wget -O /tmp/hadoop-${HADOOP_VERSION}.tar.gz \
+    "https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz" && \
+    tar -xzf /tmp/hadoop-${HADOOP_VERSION}.tar.gz -C /opt/ && \
+    ln -s /opt/hadoop-${HADOOP_VERSION} ${HADOOP_HOME} && \
+    rm -f /tmp/hadoop-${HADOOP_VERSION}.tar.gz
+
+# Set Spark classpath
+ENV SPARK_DIST_CLASSPATH="$HADOOP_HOME/etc/hadoop:$HADOOP_HOME/share/hadoop/common/lib/*:$HADOOP_HOME/share/hadoop/common/*:$HADOOP_HOME/share/hadoop/hdfs:$HADOOP_HOME/share/hadoop/hdfs/lib/*:$HADOOP_HOME/share/hadoop/hdfs/*:$HADOOP_HOME/share/hadoop/mapreduce/*:$HADOOP_HOME/share/hadoop/yarn:$HADOOP_HOME/share/hadoop/yarn/lib/*:$HADOOP_HOME/share/hadoop/yarn/*:$HADOOP_HOME/share/hadoop/tools/lib/*"
+
+# Install additional Python packages for Spark
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip3 install --no-cache-dir pygeohash requests
+
+# Copy necessary files
+COPY ./entrypoint.sh /opt/
 COPY ./dist/sparkbasics-*.egg /opt/
 
+# Ensure scripts are executable
 RUN chmod +x /opt/*.sh
 
-RUN apk update && \
-    apk add --no-cache python3 py3-pip && \
-    pip3 install --upgrade pip setuptools pygeohash requests && \
-    # Removed the .cache to save space
-    rm -rf /var/cache/apk/*
+# Ensure tini is installed and create a symlink for compatibility
+RUN ln -s /usr/bin/tini /sbin/tini
 
-WORKDIR /opt/spark/work-dir
-ENTRYPOINT [ "/opt/entrypoint.sh" ]
+# Create non-root user for security
+RUN groupadd -r spark && useradd -r -g spark -u ${SPARK_UID} spark
 
-# Specify the User that the actual main process will run as
-ARG spark_uid=185
-USER ${spark_uid}
+# Set working directory
+WORKDIR ${SPARK_HOME}/work-dir
+
+# Set ownership of necessary directories
+RUN chown -R spark:spark /opt/spark /opt/hadoop /opt/*.sh
+
+# Switch to non-root user
+USER ${SPARK_UID}
+
+# Set entrypoint
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/opt/entrypoint.sh"]
