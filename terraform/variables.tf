@@ -1,7 +1,7 @@
 variable "ENV" {
   type        = string
   description = "The prefix which should be used for all resources in this environment. Make it unique, like ksultanau."
-  default = "development"
+  default = "dev"
 }
 
 variable "LOCATION" {
@@ -20,6 +20,18 @@ variable "STORAGE_ACCOUNT_REPLICATION_TYPE" {
   type        = string
   description = "Storage Account replication type."
   default     = "LRS"
+}
+
+variable "ACR_NAME" {
+  type        = string
+  description = "The name of the Azure Container Registry."
+  default     = "" # Just provide a default static name or leave it empty.
+}
+
+variable "ACR_SKU" {
+  type        = string
+  description = "The SKU of the Azure Container Registry (e.g., Basic, Standard, Premium)."
+  default     = "Standard"
 }
 
 variable "IP_RULES" {

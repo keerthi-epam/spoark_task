@@ -1,10 +1,40 @@
+## Prerequisites:
+Before proceeding, ensure you have the following tools installed:
+  - Rancher Desktop – Required for running Kubernetes locally (alternative to Docker Desktop).
+  - Python 3 – Needed for running Python-based applications and scripts.
+  - Azure CLI (az) – Used to interact with Azure services and manage resources.
+  - Terraform – Infrastructure as Code (IaC) tool for provisioning Azure resources.
+
 ## 1. Setup local project:
-  - Setup needed requirements into your env `pip install -r requirements.txt`
-  - Add your code in `src/main/`
-  - Test your code with `src/tests/`
-  - Package your artifacts
-  - Modify dockerfile if needed
-  - Build and push docker image
+1. Setup python env by command:
+```bash
+python3 -m venv venv
+```
+2. activate python env
+```bash
+source venv/bin/activate
+```
+3. Setup needed requirements into your env:
+```bash
+pip install -r requirements.txt
+```
+4. Add your code in `src/main/`
+5. Test your code with `src/tests/`
+6. Package your artifacts:
+```bash
+python3 setup.py bdist_egg
+```
+7. Go into folder `docker/`, modify the `Dockerfile` if needed.
+8. To build the Docker image, choose the correct command based on your CPU architecture: 
+For most users (`Linux,` `Windows`, `Intel-based macOS`):
+```bash
+docker build -t spark-python-06 .
+```
+For `macOS` users with `M1`/`M2`/`M3` (ARM-based) chips:
+Important: You must specify the target platform to ensure compatibility:
+```bash
+docker build --platform linux/amd64 -t spark-python-06 .
+ ```
 
 ## 2. Create a Storage Account in Azure for Terraform State
 Terraform requires a remote backend to store its state file. Follow these steps:
@@ -102,17 +132,60 @@ az resource list --output table
 az resource list --resource-group <RESOURCE_GROUP_NAME> --output table
 ```
 
-## 7. Launch Spark app in cluster mode on AKS
+## 7. Configure and Use Azure Container Registry (ACR)
+Azure Container Registry (ACR) is used to store container images before deploying them to AKS.
+
+1. Get the `<ACR_NAME>` run the following command:
+```bash
+terraform output acr_login_server
+```
+2. Authenticate with ACR.
+Change the `<ACR_NAME>` with the output from the step `1`
+```bash
+az acr login --name <ACR_NAME>
+```  
+3. Push Docker Image to ACR:
+```bash
+docker tag spark-python-06 <ACR_NAME>/spark-python-06:latest
+docker push <ACR_NAME>/spark-python-06:latest
+```  
+4. Verify Image in ACR:
+```bash
+az acr repository list --name <ACR_NAME> --output table
+```  
+
+## 8. Retrieve kubeconfig.yaml and Set It as Default
+After Terraform applies the infrastructure, retrieve the Kubernetes configuration file:
+1. Extract kubeconfig.yaml:
+```bash
+terraform output -raw aks_kubeconfig > kubeconfig.yaml
+```  
+2. Set kubeconfig.yaml as Default for kubectl in Current Terminal Session:
+```bash
+export KUBECONFIG=$(pwd)/kubeconfig.yaml
+```
+3. Verify Kubernetes Cluster Connectivity:
+```bash
+kubectl get nodes
+```
+You should able to see list of AKS nodes. Now you're able to communicate with AKS from commandline.
+
+## 9. Launch Spark app in cluster mode on AKS
+To retrive `https://<k8s-apiserver-host>:<k8s-apiserver-port>` run the foolowing command in the `terraform/` folder:
+```bash
+terraform output aks_api_server_url
+```
+Then procceed with `spark-submit` configuration:
 ```
 spark-submit \
     --master k8s://https://<k8s-apiserver-host>:<k8s-apiserver-port> \
     --deploy-mode cluster \
     --name sparkbasics \
-    --conf spark.kubernetes.container.image=<spark-image> \
+    --conf spark.kubernetes.container.image=<ACR_NAME>:spark-python-06 \
     ...
 ```
 
-## 8. Destroy Infrastructure (Optional)
+## 10. Destroy Infrastructure (Optional)
 To remove all deployed resources, run:
 ```bash
 terraform destroy
