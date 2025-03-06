@@ -4,7 +4,7 @@ terraform {
     resource_group_name  = "<RESOURCE_GROUP_NAME>"
     storage_account_name = "<STORAGE_ACCOUNT_NAME>" # Provide Storage Account name, where Terraform Remote state is stored
     container_name       = "<CONTAINER_NAME>"
-    key                  = "bdcc.tfstate"
+    key                  = "<STORAGE_ACCOUNT_KEY>"
   }
 }
 
@@ -12,6 +12,13 @@ terraform {
 provider "azurerm" {
   features {}
   subscription_id = "<SUBSCRIPTION_ID>"
+}
+
+provider "kubernetes" {
+  host                   = azurerm_kubernetes_cluster.bdcc.kube_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.bdcc.kube_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.bdcc.kube_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.bdcc.kube_config.0.cluster_ca_certificate)
 }
 
 resource "random_string" "suffix" {
@@ -118,6 +125,64 @@ resource "azurerm_container_registry" "acr" {
   }
 }
 
+resource "kubernetes_service_account" "spark" {
+  metadata {
+    name      = "spark"
+    namespace = "default"
+  }
+  depends_on = [azurerm_kubernetes_cluster.bdcc] # Ensure AKS is provisioned first
+}
+
+resource "kubernetes_cluster_role" "spark_role" {
+  metadata {
+    name = "spark-role"
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["pods", "pods/log", "services", "configmaps", "persistentvolumeclaims", "secrets"]
+    verbs      = ["create", "get", "list", "watch", "delete", "deletecollection"]
+  }
+
+  rule {
+    api_groups = [""]
+    resources  = ["events"]
+    verbs      = ["get", "list", "watch"]
+  }
+
+  rule {
+    api_groups = ["batch"]
+    resources  = ["jobs"]
+    verbs      = ["create", "delete", "get", "list", "watch"]
+  }
+
+  rule {
+    api_groups = ["apps"]
+    resources  = ["deployments"]
+    verbs      = ["create", "delete", "get", "list", "watch"]
+  }
+  depends_on = [azurerm_kubernetes_cluster.bdcc]
+}
+
+resource "kubernetes_cluster_role_binding" "spark_role_binding" {
+  metadata {
+    name = "spark-role-binding"
+  }
+
+  subject {
+    kind      = "ServiceAccount"
+    name      = "spark"
+    namespace = "default"
+  }
+
+  role_ref {
+    kind      = "ClusterRole"
+    name      = "spark-role"
+    api_group = "rbac.authorization.k8s.io"
+  }
+  depends_on = [kubernetes_service_account.spark, kubernetes_cluster_role.spark_role]
+}
+
 # Assign AcrPull role to AKS so it can pull images from ACR
 resource "azurerm_role_assignment" "aks_acr_pull" {
   principal_id         = azurerm_kubernetes_cluster.bdcc.kubelet_identity[0].object_id
@@ -144,4 +209,14 @@ output "aks_api_server_url" {
   sensitive = true
   description = "The Kubernetes API server endpoint for AKS."
   value       = azurerm_kubernetes_cluster.bdcc.kube_config.0.host
+}
+
+output "resource_group_name" {
+  description = "The name of the created Azure Resource Group."
+  value       = azurerm_resource_group.bdcc.name
+}
+
+output "storage_account_name" {
+  description = "The name of the created Azure Storage Account."
+  value       = azurerm_storage_account.bdcc.name
 }

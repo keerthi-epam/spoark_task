@@ -5,6 +5,7 @@ FROM ubuntu:22.04
 ARG SPARK_VERSION=3.5.0
 ARG HADOOP_VERSION=3.3.6
 ARG SPARK_UID=185
+ARG SPARK_GID=999
 
 # Set environment variables
 ENV SPARK_HOME=/opt/spark
@@ -44,6 +45,7 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copy necessary files
 COPY ./entrypoint.sh /opt/
 COPY ./dist/sparkbasics-*.egg /opt/
+COPY --from=extra-source ./src /opt/src
 
 # Ensure scripts are executable
 RUN chmod +x /opt/*.sh
@@ -51,18 +53,21 @@ RUN chmod +x /opt/*.sh
 # Ensure tini is installed and create a symlink for compatibility
 RUN ln -s /usr/bin/tini /sbin/tini
 
-# Create non-root user for security
-RUN groupadd -r spark && useradd -r -g spark -u ${SPARK_UID} spark
+RUN groupadd -g $SPARK_GID spark && \
+    useradd -m -u $SPARK_UID -g $SPARK_GID spark
 
 # Set working directory
 WORKDIR ${SPARK_HOME}/work-dir
 
 # Set ownership of necessary directories
-RUN chown -R spark:spark /opt/spark /opt/hadoop /opt/*.sh
+RUN mkdir -p /opt/spark/work-dir && \
+    chown -R spark:spark /opt/spark/work-dir && \
+    chmod -R 777 /opt/spark/work-dir
+
+RUN chown spark:spark /opt/sparkbasics-*.egg && chmod 644 /opt/sparkbasics-*.egg
 
 # Switch to non-root user
 USER ${SPARK_UID}
 
 # Set entrypoint
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["/opt/entrypoint.sh"]
+ENTRYPOINT [ "/usr/bin/tini", "--", "/opt/entrypoint.sh" ]

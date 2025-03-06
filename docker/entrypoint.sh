@@ -101,11 +101,5 @@ case "$1" in
     ;;
 esac
 
-# Execute the container CMD under tini for better hygiene
-if [[ $# -eq 0 ]]; then
-    echo "No command provided, starting default shell..."
-    CMD=("bash")
-fi
-
 # Execute the container CMD under tini for better process handling
-exec /usr/bin/tini -s -- "${CMD[@]}"
+exec /sbin/tini -s -- "${CMD[@]}"
