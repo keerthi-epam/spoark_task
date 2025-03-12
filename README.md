@@ -9,6 +9,10 @@ Before proceeding, ensure you have the following tools installed:
 - Azure CLI (az) – Used to interact with Azure services and manage resources.
 - Terraform – Infrastructure as Code (IaC) tool for provisioning Azure resources.
 
+⚠️ Important: Clean Up Azure Resources Before Proceeding
+- Since you are using a **free-tier** Azure account, it’s crucial to clean up any leftover resources from previous lessons or deployments before proceeding. Free-tier accounts have strict resource quotas, and exceeding these limits may cause deployment failures.
+
+
 ## 1. Create a Storage Account in Azure for Terraform State
 
 Terraform requires a remote backend to store its state file. Follow these steps:
@@ -227,9 +231,38 @@ python3 setup.py bdist_egg
 8. Local testing (Optional)
 - Setup local project before push image to ACR, to make sure if everything goes well:
 
-```bash
-docker run --rm -it <ACR_NAME>/spark-python-06:latest spark-submit --master "local[*]" --py-files PATH_TO_YUR_EGG_FILE.egg /PATH/TO/YOUR/Python.py
-```
+    <details>
+    <summary><code>Linux</code>, <code>Windows</code>, <code>&lt;Intel-based macOS&gt;</code> (<i>click to expand</i>)</summary>
+
+    ```bash
+    docker run --rm -it <ACR_NAME>/spark-python-06:latest spark-submit --master "local[*]" --py-files PATH_TO_YUR_EGG_FILE.egg /PATH/TO/YOUR/Python.py
+    ```
+
+    </details>
+    <details>
+    <summary><code>macOS</code> with <code>M1/M2/M3</code> <code>&lt;ARM-based&gt;</code>  (<i>click to expand</i>)</summary>
+
+    <strong>Important Note for macOS (M1/M2/M3) Users</strong>
+
+    When building the Docker image with the --platform linux/amd64 flag on macOS with Apple Silicon (ARM-based chips), the
+    resulting image will be designed for x86_64 architecture (amd64). This is necessary because the image is meant for deployment
+    in a Kubernetes cluster running on amd64 nodes.
+
+    However, this also means that running the image locally using docker run without emulation will likely fail due to an architecture mismatch.
+    Solution:
+    you can build a separate ARM64 version of the image specifically for local testing using:
+
+    ```bash
+    docker build -t <ACR_NAME>/spark-python-06:local .
+    ```
+
+    Then, run the ARM64 version locally:
+
+    ```bash
+    docker run --rm -it <ACR_NAME>/spark-python-06:local spark-submit --master "local[*]" --py-files PATH_TO_YUR_EGG_FILE.egg /PATH/TO/YOUR/Python.py
+    ```
+
+    </details>
 
 Warning! (Do not forget to clean output folder, created by spark job after local testing)!
 
