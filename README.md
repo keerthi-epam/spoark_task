@@ -9,8 +9,13 @@ Before proceeding, ensure you have the following tools installed:
 - Azure CLI (az) – Used to interact with Azure services and manage resources.
 - Terraform – Infrastructure as Code (IaC) tool for provisioning Azure resources.
 
-⚠️ Important: Clean Up Azure Resources Before Proceeding
-- Since you are using a **free-tier** Azure account, it’s crucial to clean up any leftover resources from previous lessons or deployments before proceeding. Free-tier accounts have strict resource quotas, and exceeding these limits may cause deployment failures.
+📌 **Important Guidelines**
+Please read the instructions carefully before proceeding. Follow these guidelines to avoid mistakes:
+
+- If you see `<SOME_TEXT_HERE>`, you need to **replace this text and the brackets** with the appropriate value as described in the instructions.
+- Follow the steps in order to ensure proper setup.
+- Pay attention to **bolded notes**, warnings, or important highlights throughout the document.
+- Clean Up Azure Resources Before Proceeding. Since you are using a **free-tier** Azure account, it’s crucial to clean up any leftover resources from previous lessons or deployments before proceeding. Free-tier accounts have strict resource quotas, and exceeding these limits may cause deployment failures.
 
 
 ## 1. Create a Storage Account in Azure for Terraform State
@@ -19,34 +24,61 @@ Terraform requires a remote backend to store its state file. Follow these steps:
 
 ### **Option 1: Using Azure CLI [Recommended]**
 
-1. **Log in to Azure:**
+1. **Authenticate with Azure CLI**
+
+Run the following command to authenticate:
 
 ```bash
 az login
 ```
 
-This will open a browser for authentication.
+💡 **Notes**:
+- This will open a browser for authentication.
+- If you have **multiple subscriptions**, you will be prompted to **choose one**.
+- If you only have **one subscription**, it will be selected by default.
+- **Please read the output carefully** to ensure you are using the correct subscription.
 
-2. **Select Your Azure Subscription (if multiple exist):**
+2. **Create a Resource Group:**
 
-```bash
-az account set --subscription "<YOUR_SUBSCRIPTION_ID>"
-```
+📌 **Important! Naming Rules for Azure Resources**
 
-3. **Create a Resource Group:**
+<details>
+  <summary>👇<strong> Before proceeding, carefully review the naming rules to avoid deployment failures.</strong> 👇 [⬇️⬇️⬇️ Expand to see Naming Rules ⬇️⬇️⬇️]</summary>
 
-This is only used for storing Terraform state files. Terraform will create the necessary resource groups later.
+### 📝 **Naming Rules for Azure Resources**
+Before creating any resources, ensure that you follow **Azure's naming conventions** to avoid errors.
+
+- **Resource names must follow specific character limits and allowed symbols** depending on the resource type.
+- **Using unsupported special characters can cause deployment failures.**
+- **Storage accounts, resource groups, and other Azure resources have different rules.**
+
+🔹 **Common Rules Across Most Resources**:
+- **Allowed characters:** Only **letters (A-Z, a-z)**, **numbers (0-9)**.
+- **Case Sensitivity:** Most names are **lowercase only** (e.g., storage accounts).
+- **Length Restrictions:** Vary by resource type (e.g., Storage accounts: **3-24 characters**).
+- **No special symbols:** Avoid characters like `@`, `#`, `$`, `%`, `&`, `*`, `!`, etc.
+- **Hyphens and underscores:** Some resources support them, but rules differ.
+
+📖 **For complete naming rules, refer to the official documentation:**  
+🔗 [Azure Naming Rules and Restrictions](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules)
+
+</details>
+
+To create a Resource Group name run the command:
+
 ```bash
 az group create --name <RESOURCE_GROUP_NAME> --location <AZURE_REGION>
 ```
 
-4. **Create a Storage Account:**
+3. **Create a Storage Account:**
+
+⚠️  **Storage Account name, are globally unique, so you must choose a name that no other Azure user has already taken.** 
 
 ```bash
 az storage account create --name <STORAGE_ACCOUNT_NAME> --resource-group <RESOURCE_GROUP_NAME> --location <AZURE_REGION> --sku Standard_LRS
 ```
 
-5. **Create a Storage Container:**
+4. **Create a Storage Container:**
 
 ```bash
 az storage container create --name <CONTAINER_NAME> --account-name <STORAGE_ACCOUNT_NAME>
@@ -87,7 +119,7 @@ az account show --query id --output tsv
 
 ## 3. Update Terraform Configuration
 
-Modify `main.tf` and replace placeholders with your actual values.
+Navigate into folder `terraform`. Modify `main.tf` and replace placeholders with your actual values.
 
 - Get a Storage Account Key (`<STORAGE_ACCOUNT_KEY>`):
 
@@ -113,6 +145,12 @@ az storage account keys list --resource-group <RESOURCE_GROUP_NAME> --account-na
 ```
 
 ## 4. Deploy Infrastructure with Terraform
+
+To start the deployment using Terraform scripts, you need to navigate to the `terraform` folder.
+
+```bash
+cd terraform/
+```
 
 Run the following Terraform commands:
 
@@ -336,7 +374,11 @@ spark-submit \
 kubectl logs spark-driver
 ```
 
-## 10. Destroy Infrastructure (Optional)
+## 10. Destroy Infrastructure (Required Step)
+
+After completing all steps, **destroy the infrastructure** to clean up all deployed resources.
+
+⚠️ **Warning:** This action is **irreversible**. Running the command below will **delete all infrastructure components** created in previous steps.
 
 To remove all deployed resources, run:
 
