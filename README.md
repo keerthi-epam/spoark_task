@@ -1,387 +1,338 @@
-# SparkBasics [python]
+## Spark ETL Job on Kubernetes with Azure
+
+## Project Description
+This project implements a Spark ETL pipeline that processes hotel and weather data stored in cloud storage (Azure). The job reads raw data, cleans incorrect latitude and longitude values using OpenCage Geocoding API, generates a geohash, and then joins the datasets based on the geohash. The enriched data is stored in a provisioned storage account in Parquet format. The Spark job is deployed on Kubernetes using Terraform scripts.
 
 ## Prerequisites
 
-Before proceeding, ensure you have the following tools installed:
+Before proceeding, ensure you have the following installed:
+•	Rancher Desktop – Required for running Kubernetes locally (alternatively you can use Docker Desktop to run Kubernetes).
+•	Python3 – Needed for running Python-based applications and scripts.
+•	Azure CLI (az) – Used to interact with Azure services and manage resources.
+•	Terraform – Infrastructure as Code (IaC) tool for provisioning resources.
 
-- Rancher Desktop – Required for running Kubernetes locally (alternative to Docker Desktop). Please keep it running.
-- Python 3 – Needed for running Python-based applications and scripts.
-- Azure CLI (az) – Used to interact with Azure services and manage resources.
-- Terraform – Infrastructure as Code (IaC) tool for provisioning Azure resources.
+## 1.Setting Up Environment (Azure Storage for Terraform State):
+Terraform requires a remote backend to store its state file, ensuring consistency, collaboration, and recovery in case of failures. Using Azure Storage for Terraform state allows multiple users to work on the same infrastructure while maintaining a single source of truth for the state file. This setup prevents conflicts and ensures secure storage of infrastructure changes.
 
-📌 **Important Guidelines**
-Please read the instructions carefully before proceeding. Follow these guidelines to avoid mistakes:
+I.	 Log in to Azure Portal
 
-- If you see `<SOME_TEXT_HERE>`, you need to **replace this text and the brackets** with the appropriate value as described in the instructions.
-- Follow the steps in order to ensure proper setup.
-- Pay attention to **bolded notes**, warnings, or important highlights throughout the document.
-- Clean Up Azure Resources Before Proceeding. Since you are using a **free-tier** Azure account, it’s crucial to clean up any leftover resources from previous lessons or deployments before proceeding. Free-tier accounts have strict resource quotas, and exceeding these limits may cause deployment failures.
+II.	Navigate to Resource Groups and click Create
+
+III.	Enter a Resource Group Name, select a Region (WestEurope), and click Review + Create.
+
+IV.	Once the Resource Group is created, go to Storage Accounts and click Create.
+
+V.	Fill in the required details: 
+o	Storage Account Name(stdevwesteurope3vzr)
+o	Resource Group (Select the one you just created) (MyResourceGroup)
+o	Region (Choose your preferred region) (WestEurope)
+o	Performance: Standard
+o	Redundancy: Locally Redundant Storage (LRS)
+
+VI.	Click Review + Create and then Create.
+
+VII.	Once created, go to the Storage Account → Data Storage → Containers → Click + Container.
+
+VIII.	Name it tfstate (as example) and set Access Level to Private.
+
+IX.	To get <STORAGE_ACCOUNT_KEY>: Navigate to your Storage Account →Security & Networking → Access Keys. Press show button on key1
+
+Screeshot:
+![image](https://github.com/user-attachments/assets/fb053eed-9ac9-4903-939a-7e9178bd1b9e)
+
+## 2.Get Your Subscription Id:
+The Azure Subscription ID is a crucial identifier that allows Terraform to deploy and manage resources within a specific subscription. It is necessary for authentication, ensuring that all infrastructure provisioning occurs within the correct Azure account. By specifying the subscription ID in Terraform, you prevent accidental deployments in unintended environments, which is especially important in organizations managing multiple subscriptions. Additionally, it helps track resource usage, manage costs, and enforce access control policies effectively.
+Navigate to Azure Portal → Subscriptions and copy your Subscription ID.
+![image](https://github.com/user-attachments/assets/6f118670-2b8f-4584-82d4-8c72d15f5504)
 
 
-## 1. Create a Storage Account in Azure for Terraform State
+ 
+## 3.Configure Terraform Backend:
+Since the provided remote repository is shared among multiple users, modifying it directly is not feasible. To accommodate customization, the repository was cloned to a local environment, allowing changes to be made without affecting other users' configurations.
 
-Terraform requires a remote backend to store its state file. Follow these steps:
+I.	Clone the remote repository:
+git clone git@git.epam.com:epmcbdcc/trainings/bd201/m06_sparkbasics_python_azure.git
+cd git@git.epam.com:epmcbdcc/trainings/bd201/m06_sparkbasics_python_azure.git
 
-### **Option 1: Using Azure CLI [Recommended]**
+II.	Get the storage account key:
+az storage account keys list --resource-group MyGroupResource --account-name sparkbasics123 --query "[0].value"
+![image](https://github.com/user-attachments/assets/a6e72a64-bcb8-4f48-a74f-73e1c22c22e4)
 
-1. **Authenticate with Azure CLI**
-
-Run the following command to authenticate:
-
-```bash
-az login
-```
-
-💡 **Notes**:
-- This will open a browser for authentication.
-- If you have **multiple subscriptions**, you will be prompted to **choose one**.
-- If you only have **one subscription**, it will be selected by default.
-- **Please read the output carefully** to ensure you are using the correct subscription.
-
-2. **Create a Resource Group:**
-
-📌 **Important! Naming Rules for Azure Resources**
-
-<details>
-  <summary>👇<strong> Before proceeding, carefully review the naming rules to avoid deployment failures.</strong> 👇 [⬇️⬇️⬇️ Expand to see Naming Rules ⬇️⬇️⬇️]</summary>
-
-### 📝 **Naming Rules for Azure Resources**
-Before creating any resources, ensure that you follow **Azure's naming conventions** to avoid errors.
-
-- **Resource names must follow specific character limits and allowed symbols** depending on the resource type.
-- **Using unsupported special characters can cause deployment failures.**
-- **Storage accounts, resource groups, and other Azure resources have different rules.**
-
-🔹 **Common Rules Across Most Resources**:
-- **Allowed characters:** Only **letters (A-Z, a-z)**, **numbers (0-9)**.
-- **Case Sensitivity:** Most names are **lowercase only** (e.g., storage accounts).
-- **Length Restrictions:** Vary by resource type (e.g., Storage accounts: **3-24 characters**).
-- **No special symbols:** Avoid characters like `@`, `#`, `$`, `%`, `&`, `*`, `!`, etc.
-- **Hyphens and underscores:** Some resources support them, but rules differ.
-
-📖 **For complete naming rules, refer to the official documentation:**  
-🔗 [Azure Naming Rules and Restrictions](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules)
-
-</details>
-
-To create a Resource Group name run the command:
-
-```bash
-az group create --name <RESOURCE_GROUP_NAME> --location <AZURE_REGION>
-```
-
-3. **Create a Storage Account:**
-
-⚠️  **Storage Account name, are globally unique, so you must choose a name that no other Azure user has already taken.** 
-
-```bash
-az storage account create --name <STORAGE_ACCOUNT_NAME> --resource-group <RESOURCE_GROUP_NAME> --location <AZURE_REGION> --sku Standard_LRS
-```
-
-4. **Create a Storage Container:**
-
-```bash
-az storage container create --name <CONTAINER_NAME> --account-name <STORAGE_ACCOUNT_NAME>
-```
-
-### **Option 2: Using Azure Portal (Web UI)**
-1. **Log in to [Azure Portal](https://portal.azure.com/)**
-2. Navigate to **Resource Groups** and click **Create**.
-3. Enter a **Resource Group Name**, select a **Region**, and click **Review + Create**.
-4. Once the Resource Group is created, go to **Storage Accounts** and click **Create**.
-5. Fill in the required details:
-   - **Storage Account Name**
-   - **Resource Group** (Select the one you just created)
-   - **Region** (Choose your preferred region)
-   - **Performance**: Standard
-   - **Redundancy**: Locally Redundant Storage (LRS)
-6. Click **Review + Create** and then **Create**.
-7. Once created, go to the **Storage Account** → **Data Storage** → **Containers** → Click **+ Container**.
-8. Name it `tfstate`  (as example) and set **Access Level** to Private.
-9. To get `<STORAGE_ACCOUNT_KEY>`: Navigate to your **Storage Account** →**Security & Networking** → **Access Keys**. Press `show` button on `key1`
-
-## 2. Get Your Azure Subscription ID
-
-### **Option 1: Using Azure Portal (Web UI)**
-
-1. **Go to [Azure Portal](https://portal.azure.com/)**
-2. Click on **Subscriptions** in the left-hand menu.
-3. You will see a list of your subscriptions.
-4. Choose the subscription you want to use and copy the **Subscription ID**.
-
-### **Option 2: Using Azure CLI**
-
-Retrieve it using Azure CLI:
-
-```bash
-az account show --query id --output tsv
-```
-
-## 3. Update Terraform Configuration
-
-Navigate into folder `terraform`. Modify `main.tf` and replace placeholders with your actual values.
-
-- Get a Storage Account Key (`<STORAGE_ACCOUNT_KEY>`):
-
-```bash
-az storage account keys list --resource-group <RESOURCE_GROUP_NAME> --account-name <STORAGE_ACCOUNT_NAME> --query "[0].value"
-```
-
-- **Edit the backend block in `main.tf`:**
-
-```hcl
-  terraform {
-    backend "azurerm" {
-      resource_group_name  = "<RESOURCE_GROUP_NAME>"
-      storage_account_name = "<STORAGE_ACCOUNT_NAME>"
-      container_name       = "<CONTAINER_NAME>"
-      key                  = "<STORAGE_ACCOUNT_KEY>"
-    }
+ 
+III.	Edit the main.tf file:
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "MyResourceGroup"
+    storage_account_name = " tdevwesteurope3vzr"
+    container_name       = "data"
+    key                  = "STORAGE_ACCOUNT_KEY"
   }
-  provider "azurerm" {
-    features {}
-    subscription_id = "<SUBSCRIPTION_ID>"
-  }
-```
+}
+provider "azurerm" {
+  features {}
+  subscription_id = " 627b2fbd-dfd4-47c4-a964-3246ce1072d7
+}
+IV.	Add changes to the repository
+
+V.	Commit the changes that had made in the file
 
 ## 4. Deploy Infrastructure with Terraform
+Deploying infrastructure with Terraform is a crucial step in automating the provisioning of cloud resources. Terraform is an Infrastructure as Code (IaC) tool that allows users to define, manage, and deploy infrastructure using declarative configuration files. By using Terraform, organizations can ensure consistency, version control, and repeatability in their cloud deployments.
 
-To start the deployment using Terraform scripts, you need to navigate to the `terraform` folder.
+I.	Initialize Terraform:
+This sets up the working directory, downloads necessary provider plugins, and configures the backend for storing the Terraform state.
+Command:terraform init
+![image](https://github.com/user-attachments/assets/4ec92fdc-447d-4397-a335-768be7965fe7)
 
-```bash
-cd terraform/
-```
+ 
+II.	Create an execution plan:
+This command generates a preview of the changes Terraform will make to the infrastructure, helping users validate configurations before applying them.
+Command:terraform plan -out terraform.plan
+![image](https://github.com/user-attachments/assets/e0e8ed97-5727-4591-a521-ceac0b8f3053)
 
-Run the following Terraform commands:
+ 
+III.	Apply the plan:
+This step provisions the defined infrastructure by interacting with the cloud provider’s API.
+Command:terraform apply terraform.plan
 
-```bash
-terraform init
-```  
+IV.	Verify deployment:
+Users can check the deployed resources and their attributes to confirm successful deployment.
+Command:Terraform output MyGroupResource
 
-```bash
-terraform plan -out terraform.plan
-```  
-
-```bash
-terraform apply terraform.plan
-```  
-
-To see the `<RESOURCE_GROUP_NAME_CREATED_BY_TERRAFORM>` (resource group that was created by terraform), run the command:
-
-```bash
-terraform output resource_group_name
-```
-
-## 5. Verify Resource Deployment in Azure
-
-After Terraform completes, verify that resources were created:
-
-1. **Go to the [Azure Portal](https://portal.azure.com/)**
-2. Navigate to **Resource Groups** → **Find `<RESOURCE_GROUP_NAME_CREATED_BY_TERRAFORM>`**
-3. Check that the resources (Storage Account, Databricks, etc.) are created.
-
-Alternatively, check via CLI:
-
-```bash
-az resource list --resource-group <RESOURCE_GROUP_NAME_CREATED_BY_TERRAFORM> --output table
-```
+## 5.Verify Azure Resource Deployment
+Verifying Azure resource deployment ensures that all infrastructure components have been successfully created as per the Terraform configuration. This step helps confirm that the necessary resources, such as storage accounts and resource groups, exist and are correctly configured.
+Via Azure Portal: Navigate to Resource Groups and locate <RESOURCE_GROUP_NAME_CREATED_BY_TERRAFORM>.
+<MyGroupResource>
 
 ## 6. Configure and Use Azure Container Registry (ACR)
-
 Azure Container Registry (ACR) is used to store container images before deploying them to AKS.
-
-1. Get the `<ACR_NAME>` run the following command:
-
-```bash
+Get the <ACR_NAME> run the following command:
 terraform output acr_login_server
-```
-
-2. Authenticate with ACR.
-
-Change the `<ACR_NAME>` with the output from the step `6.1`
-
-```bash
+Authenticate with ACR.
+Change the <ACR_NAME> with the output from the step 6.1
 az acr login --name <ACR_NAME>
-```  
 
-## 7. Upload the data files into Azure Conatainers
+## 7. Unzipping the Dataset  
+The given dataset was provided in a compressed ZIP format. To extract it, we used the following command:  
+unzip m06sparkbasics.zip -d /path/to/destination
+ 
+After extraction, the dataset was structured as follows:
+ 
+m06sparkbasics/ <br/>
+├── hotels.csv <br/>
+├── weather/ <br/>
+│   ├── year=2017/ <br/>
+│   │   ├── month=01/ <br/>
+│   │   │   ├── day=01/ <br/>
+│   │   │   │   ├── part-00000.parquet <br/>
+│   │   │   │   ├── .part-00000.parquet.crc <br/>
+│   │   ├── month=02/ <br/>
+│   │   │   ├── day=01/ <br/>
+│   │   │   │   ├── part-00000.parquet <br/>
+│   │   │   │   ├── .part-00000.parquet.crc <br/>
+│   ├── year=2016/ <br/>
+│   │   ├── month=12/ <br/>
+│   │   │   ├── day=31/ <br/>
+│   │   │   │   ├── part-00000.parquet <br/>
+│   │   │   │   ├── .part-00000.parquet.crc
 
-1. Log in to [Azure Portal](https://portal.azure.com/)
-2. Go to your STORAGE account => Data Storage => Containers
+## 8.Upload Data Files to Azure Storage
+Uploading data files to Azure Storage ensures that the necessary datasets are available for processing in the Spark ETL pipeline. The files stored in Azure Blob Storage serve as input for data transformation and enrichment operations.
 
-- to get actual STORAGE account name, you can run a command from the `terraform` folder:
+I.	Retrieve the storage account name:
+Command: terraform output storage_account_name
 
-```bash
-terraform output storage_account_name
-```
+II.	Upload files to the data container via Azure Portal.
 
-3. Choose the conatiner `data`
-4. You should see the upload button
-5. Upload the files here.
+III.	Verify Azure Resource Deployment
+Azure Portal: Navigate to Resource Groups and locate <RESOURCE_GROUP_NAME_CREATED_BY_TERRAFORM>.
 
-## 8. Setup local project
+## 9.Set Up Local Development Environment
+Setting up a local development environment is essential for developing, testing, and   debugging Spark ETL jobs before deploying them to Kubernetes. It provides a controlled space to install dependencies, configure the project structure, and validate code functionality. This setup ensures consistency across development and production environments, reducing errors and improving deployment efficiency.
 
-1. Setup python env by command:
+I.	Create a Python Virtual Environment
+•	The command python3 -m venv venv creates an isolated Python environment named venv.
+•	Activating it with source venv/bin/activate ensures that all dependencies are installed in the virtual environment rather than system-wide.
 
-```bash
-python3 -m venv venv
-```
+II.	Activate python env
+•	source venv/bin/activate
 
-2. activate python env
+III.	Install Dependencies
+•	pip install -r requirements.txt installs all required Python packages listed in requirements.txt.
+•	This step ensures that all necessary libraries are available for running the ETL process.
 
-```bash
-source venv/bin/activate
-```
+IV.	Organize Source Code and Tests
+•	Adding source code to src/main/ maintains a structured and modular project, making it easier to manage, test, and debug.
 
-3. Setup needed requirements into your env:
+Folder Structure:
+•	-src/
+•	-main/  # Contains the main source code of the project
+•	-tests/   #contains the unit tests for the project
+•	-Readme.md   # Documentation for the project
 
-```bash
-pip install -r requirements.txt
-```
+Workflow Explanation:
 
-4. Add your code in `src/main/`
-5. Add and Run UnitTests into folder `src/tests/`
-6. Package your artifacts:
+Spark Session Initialization
+•	The Spark session is configured with necessary Azure storage dependencies.
+•	Authentication for Azure Blob Storage is established.
 
-```bash
-python3 setup.py bdist_egg
-```
+Reading Hotel Data
+•	The hotel dataset is read from Azure Blob Storage (*.csv.gz format).
+•	Rows with missing Latitude or Longitude are filtered.
 
-7. ⚠️  To build the Docker image, choose the correct command based on your CPU architecture:
+Geolocation Data Enrichment
+•	The OpenCage API is used to fetch latitude and longitude for missing values.
+•	A UDF (get_lat_lon_udf) is applied to retrieve geolocation data.
 
-    <details>
-    <summary><code>Linux</code>, <code>Windows</code>, <code>&lt;Intel-based macOS&gt;</code> (<i>click to expand</i>)</summary>
+Generating Geohash
+•	A geohash (4-character) is generated from latitude and longitude to enable spatial joins.
 
-    ```bash
-    docker build -t <ACR_NAME>/park-python-06:latest -f docker/Dockerfile docker/ --build-context extra-source=./
-    ```
+Reading Weather Data
+•	The weather dataset is read from Azure Blob Storage (*.parquet format).
+•	The date (wthr_date) is split into year, month, and day columns for partitioning.
+•	Geohash is generated for weather data using latitude and longitude.
 
-    </details>
-    <details>
-    <summary><code>macOS</code> with <code>M1/M2/M3</code> <code>&lt;ARM-based&gt;</code>  (<i>click to expand</i>)</summary>
+Joining Weather and Hotels Data
+•	The joined dataset is saved locally in Parquet format.
+•	The final dataset is written to Azure Blob Storage with partitioning by year, month, and day.
 
-    ```bash
-    docker build --platform linux/amd64 -t <ACR_NAME>/spark-python-06:latest -f docker/Dockerfile docker/ --build-context extra-source=./
-    ```
+Output Details
+Local Output Path: output/joined_data_left.parquet
+Azure Blob Storage Output Path: abfss://data@stdevwesteurope3vzr.dfs.core.windows.net/output1
+The dataset is partitioned by wthr_year, wthr_month, wthr_day for efficient querying.
 
-    </details>
+ ![image](https://github.com/user-attachments/assets/03538bdc-5d69-4ace-b46e-878d8f227c04)
 
-8. Local testing (Optional)
-- Setup local project before push image to ACR, to make sure if everything goes well:
+ ![image](https://github.com/user-attachments/assets/7b70bebd-073e-48fa-973e-9d0cf6ed6a1a)
 
-    <details>
-    <summary><code>Linux</code>, <code>Windows</code>, <code>&lt;Intel-based macOS&gt;</code> (<i>click to expand</i>)</summary>
+ ![image](https://github.com/user-attachments/assets/6d75539d-62dd-4801-82c8-11eda994b32d)
 
-    ```bash
-    docker run --rm -it <ACR_NAME>/spark-python-06:latest spark-submit --master "local[*]" --py-files PATH_TO_YUR_EGG_FILE.egg /PATH/TO/YOUR/Python.py
-    ```
 
-    </details>
-    <details>
-    <summary><code>macOS</code> with <code>M1/M2/M3</code> <code>&lt;ARM-based&gt;</code>  (<i>click to expand</i>)</summary>
 
-    <strong>Important Note for macOS (M1/M2/M3) Users</strong>
+V.	Organise unit test cases code and Run UnitTests into folder src/tests/ 
+Adding  unit test cases source code to src/tests/ maintains a structured and modular project, making it easier to manage, test, and debug.
+![image](https://github.com/user-attachments/assets/b4106011-eb97-4e40-8af1-e1e1220b3859)
 
-    When building the Docker image with the --platform linux/amd64 flag on macOS with Apple Silicon (ARM-based chips), the
-    resulting image will be designed for x86_64 architecture (amd64). This is necessary because the image is meant for deployment
-    in a Kubernetes cluster running on amd64 nodes.
+ 
+VI.	Package Artifacts
+python3 setup.py bdist_egg creates a distributable .egg package of the project, which can be deployed or reused in other environments.
+This step ensures that the ETL job can be packaged and executed efficiently within Kubernetes or other environments.
+Output:
+![image](https://github.com/user-attachments/assets/f6eab805-de19-4109-b09e-1432a053000d)
 
-    However, this also means that running the image locally using docker run without emulation will likely fail due to an architecture mismatch.
-    Solution:
-    you can build a separate ARM64 version of the image specifically for local testing using:
+ 
+VII.	Building the Docker Image on Windows
+Building Docker images ensures consistency, portability, and scalability of applications across environments. It encapsulates dependencies, making deployments reliable. Docker images enable efficient resource utilization, version control, and seamless scaling in Kubernetes or cloud platforms. This ensures smooth execution of your Spark ETL application across different systems.
 
-    ```bash
-    docker build -t <ACR_NAME>/spark-python-06:local .
-    ```
+Command: docker build -t <ACR_NAME>/spark-python-06:latest -fdocker/Dockerfile docker/ --build-context extra-source=./(Replace the ACR_NAME with your actual value).
+This command ensures the image is built using the AMD64 (x86_64) architecture, which is compatible with cloud-based Kubernetes clusters.
+The --build-context extra-source=./ argument ensures all necessary files are included in the build process.
+Update the docker file with your actual directory locations.
+![image](https://github.com/user-attachments/assets/ab568840-b700-4aad-99a2-1568152abead)
 
-    Then, run the ARM64 version locally:
+ 
+VIII.	Push Docker Image to ACR:
+Pushing a Docker image to Azure Container Registry (ACR) is essential for deploying containerized applications on Azure services like AKS, ACI, or App Service. It provides a secure, scalable, and centralized storage for managing and versioning images.
 
-    ```bash
-    docker run --rm -it <ACR_NAME>/spark-python-06:local spark-submit --master "local[*]" --py-files PATH_TO_YUR_EGG_FILE.egg /PATH/TO/YOUR/Python.py
-    ```
+•	Build the Docker Image
+Navigate to the directory where your Dockerfile is located and run the following command to build the image:
+docker build -t acrdevwesteurope3vzr/park-python-06:latest -f docker/Dockerfile .
+This command builds the image and tags it as park-python-06:latest
+![image](https://github.com/user-attachments/assets/27cc2f23-25a2-4edd-95ba-c13b3d265c9f)
 
-    </details>
+ 
+•	Verify the Built Image
+Check if the image is built successfully by listing all Docker images:
+Command:docker images
+Ensure the repository name and tag are correct.
+![image](https://github.com/user-attachments/assets/b506d65f-fcdb-4dfa-9a6d-a67a6d09fa34)
 
-Warning! (Do not forget to clean output folder, created by spark job after local testing)!
+ 
+•	Login to Azure Container Registry (ACR)
+Before pushing the image, you need to authenticate with ACR:
+Command:docker login acrdevwesteurope3vzr.azurecr.io
+When prompted, enter the username and password for ACR authentication
+![image](https://github.com/user-attachments/assets/01df8659-3040-4f76-b088-eb5ef1456526)
 
-9. Push Docker Image to ACR:
+ 
+•	Tag the Image for ACR
+Docker needs the image tag to match the ACR repository format. Tag the built image correctly:
+Command: docker tag acrdevwesteurope3vzr/park-python-06:latest acrdevwesteurope3vzr.azurecr.io/park-python-06:latest
+This renames the image with the ACR domain prefix.
 
-```bash
-docker push <ACR_NAME>/spark-python-06:latest
-```  
+•	Push the Image to ACR
+Now, push the tagged image to Azure Container Registry:
+Command: docker push acrdevwesteurope3vzr.azurecr.io/park-python-06:latest
+This uploads the image to ACR, making it accessible for deployments.
+![image](https://github.com/user-attachments/assets/456dc169-75d7-4f6f-8791-2ef9011db639)
 
-9. Verify Image in ACR:
+ 
+IX.	Verify the Image in ACR
+Check if the image is successfully pushed by listing repositories in ACR:
+Command: az acr repository list --name acrdevwesteurope3vzr --output table
+You should see park-python-06 in the list. 
+![image](https://github.com/user-attachments/assets/37004592-96f5-40b6-93a4-40ccb4cd12c0)
 
-```bash
-az acr repository list --name <ACR_NAME> --output table
-```  
 
-## 8. Retrieve kubeconfig.yaml and Set It as Default
+## 10: Retrieve kubeconfig.yaml and Set It as Default
+Once your Azure Kubernetes Service (AKS) cluster is created, you need to configure kubectl to communicate with the cluster. Follow the steps below to retrieve and set up the kubeconfig.yaml file.
 
-1. Extract `kubeconfig.yaml` from the directory `/terraform`:
+I.	Initialize Terraform
+Before deploying AKS, Terraform needs to be initialized. This downloads the required providers and modules.
+Command:terraform init
+Command: terraform init -migrate-state
+![image](https://github.com/user-attachments/assets/f5de679b-26d7-4538-b2c5-cdf71f6d67e5)
 
-```bash
-terraform output -raw aks_kubeconfig > kubeconfig.yaml
-```  
+ 
+II.	2: Apply Terraform Configuration
+Now, apply the Terraform configuration to provision resources in Azure.
+Command:terraform apply -auto-approve
+Terraform will create the AKS cluster and required resources.
+![image](https://github.com/user-attachments/assets/4e03ca79-8b56-4087-a9e3-49bf61c94392)
 
-2. Set `kubeconfig.yaml` as Default for kubectl in Current Terminal Session:
+ 
+III.	Retrieve kubeconfig.yaml
+After the cluster is successfully provisioned, extract the kubeconfig.yaml file to authenticate with AKS.
+Terraform stores the AKS cluster credentials in its output. Run the following command to extract the kubeconfig.yaml file:
+Command: terraform output -raw aks_kubeconfig > kubeconfig.yaml
+This command retrieves the AKS cluster's kubeconfig and saves it in the current directory as kubeconfig.yaml.
 
-```bash
-export KUBECONFIG=$(pwd)/kubeconfig.yaml
-```
+IV.	Set kubeconfig.yaml as Default for kubectl
+To use kubectl with your newly created AKS cluster, set the kubeconfig file as the default for the current session.
+Command: $env:KUBECONFIG = "$(Get-Location)\kubeconfig.yaml"
+This tells kubectl to use this specific kubeconfig file instead of the default one
 
-3. Verify Kubernetes Cluster Connectivity:
+V.	Verify Kubernetes Cluster Connectivity
+Now, check if the Kubernetes nodes are up and running.
+Command: kubectl get nodes
+![image](https://github.com/user-attachments/assets/c8754fea-c022-41a5-b758-f51763a9c222)
 
-```bash
-kubectl get nodes
-```
+ 
+VI.	List Running Pods (Optional)
+To ensure that all Kubernetes system pods are running properly, execute:
+Command: kubectl get pods -A
+This command lists all pods across namespaces, including system pods required for AKS.   
+![image](https://github.com/user-attachments/assets/a1ce6cdf-715a-4503-86f2-31dad6aca222)
 
-You should able to see list of AKS nodes. Now you're able to communicate with AKS from commandline.
 
-## 9. Launch Spark app in cluster mode on AKS
 
-- To retrive `https://<k8s-apiserver-host>:<k8s-apiserver-port>` run the foolowing command in the `terraform/` folder:
 
-```bash
-terraform output aks_api_server_url
-```
 
-- Then procceed with `spark-submit` configuration (before execute this command, update the placeholders):
+## 11. Launch Spark app in cluster mode on AKS
 
-```bash
-spark-submit \
-    --master k8s://https://<k8s-apiserver-host>:<k8s-apiserver-port> \
-    --deploy-mode cluster \
-    --name sparkbasics \
-    --conf spark.kubernetes.container.image=<ACR_NAME>:spark-python-06:latest \
-    --conf spark.kubernetes.driver.request.cores=500m \
-    --conf spark.kubernetes.driver.request.memory=500m \
-    --conf spark.kubernetes.executor.request.memory=500m \
-    --conf spark.kubernetes.executor.request.cores=500m \
-    --conf spark.kubernetes.namespace=default \
-    --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark \
-    --conf spark.kubernetes.driver.pod.name=spark-driver \
-    --conf spark.kubernetes.executor.instances=1 \
-    --conf spark.pyspark.python=python3 \
-    --conf spark.pyspark.driver.python=python3 \
-    --py-files local:///opt/<YOUR_PYTHON_EGG_FILE_NAME> \
-    local:///opt/src/main/python/<YOUR_PYTHON_PROJECT_FILE_PY>
-```
+I.	 Retrieve AKS API Server URL
+To connect Spark to AKS, you need the Kubernetes API Server URL. Run the following command inside your Terraform project directory (terraform/):
+Command: terraform output aks_api_server_url
+![image](https://github.com/user-attachments/assets/ca1e91cd-f26d-4e38-9b98-8f0096ed487d)
 
-- once jobs finished, you can verify the output from the spark job:
+ 
+This Command Fetches the Kubernetes API Server URL, which is required to submit Spark jobs to AKS.
+II.	Configure and Submit Spark Job
+Now, update the placeholders in the spark-submit command and run it.
+![image](https://github.com/user-attachments/assets/dfbe0b50-fe11-4f85-b8c1-340a5c1fee36)
 
-```bash
-kubectl logs spark-driver
-```
 
-## 10. Destroy Infrastructure (Required Step)
+            
 
-After completing all steps, **destroy the infrastructure** to clean up all deployed resources.
 
-⚠️ **Warning:** This action is **irreversible**. Running the command below will **delete all infrastructure components** created in previous steps.
 
-To remove all deployed resources, run:
-
-```bash
-terraform destroy
-```
