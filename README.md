@@ -51,7 +51,8 @@ Navigate to Azure Portal → Subscriptions and copy your Subscription ID.
 Since the provided remote repository is shared among multiple users, modifying it directly is not feasible. To accommodate customization, the repository was cloned to a local environment, allowing changes to be made without affecting other users' configurations.
 
 I.	Clone the remote repository:
-git clone git@git.epam.com:epmcbdcc/trainings/bd201/m06_sparkbasics_python_azure.git
+```git clone git@git.epam.com:epmcbdcc/trainings/bd201/m06_sparkbasics_python_azure.git
+```
 cd git@git.epam.com:epmcbdcc/trainings/bd201/m06_sparkbasics_python_azure.git
 
 II.	Get the storage account key:
