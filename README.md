@@ -389,7 +389,7 @@ III.Verify the spark job
 ```bash
 kubectl logs spark-driver-4522
 ```
-![image](https://github.com/user-attachments/assets/7b70bebd-073e-48fa-973e-9d0cf6ed6a1a)
+![image](https://github.com/user-attachments/assets/03538bdc-5d69-4ace-b46e-878d8f227c04)
 
 
             
