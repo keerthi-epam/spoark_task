@@ -51,12 +51,16 @@ Navigate to Azure Portal → Subscriptions and copy your Subscription ID.
 Since the provided remote repository is shared among multiple users, modifying it directly is not feasible. To accommodate customization, the repository was cloned to a local environment, allowing changes to be made without affecting other users' configurations.
 
 I.	Clone the remote repository:
-```git clone git@git.epam.com:epmcbdcc/trainings/bd201/m06_sparkbasics_python_azure.git
+```bash
+git clone git@git.epam.com:epmcbdcc/trainings/bd201/m06_sparkbasics_python_azure.git
 ```
+```bash
 cd git@git.epam.com:epmcbdcc/trainings/bd201/m06_sparkbasics_python_azure.git
-
+```
 II.	Get the storage account key:
+```bash
 az storage account keys list --resource-group MyGroupResource --account-name sparkbasics123 --query "[0].value"
+```
 ![image](https://github.com/user-attachments/assets/a6e72a64-bcb8-4f48-a74f-73e1c22c22e4)
 
  
@@ -82,23 +86,30 @@ Deploying infrastructure with Terraform is a crucial step in automating the prov
 
 I.	Initialize Terraform:
 This sets up the working directory, downloads necessary provider plugins, and configures the backend for storing the Terraform state.
-Command:terraform init
+```bash
+terraform init
+```
 ![image](https://github.com/user-attachments/assets/4ec92fdc-447d-4397-a335-768be7965fe7)
 
  
 II.	Create an execution plan:
 This command generates a preview of the changes Terraform will make to the infrastructure, helping users validate configurations before applying them.
-Command:terraform plan -out terraform.plan
+```bash
+terraform plan -out terraform.plan
+```
 ![image](https://github.com/user-attachments/assets/e0e8ed97-5727-4591-a521-ceac0b8f3053)
 
  
 III.	Apply the plan:
 This step provisions the defined infrastructure by interacting with the cloud provider’s API.
-Command:terraform apply terraform.plan
-
+```bash
+terraform apply terraform.plan
+```
 IV.	Verify deployment:
 Users can check the deployed resources and their attributes to confirm successful deployment.
-Command:Terraform output MyGroupResource
+```bash
+Terraform output MyGroupResource
+```
 
 ## 5.Verify Azure Resource Deployment
 Verifying Azure resource deployment ensures that all infrastructure components have been successfully created as per the Terraform configuration. This step helps confirm that the necessary resources, such as storage accounts and resource groups, exist and are correctly configured.
@@ -108,10 +119,14 @@ Via Azure Portal: Navigate to Resource Groups and locate <RESOURCE_GROUP_NAME_CR
 ## 6. Configure and Use Azure Container Registry (ACR)
 Azure Container Registry (ACR) is used to store container images before deploying them to AKS.
 Get the <ACR_NAME> run the following command:
+```bash
 terraform output acr_login_server
+```
 Authenticate with ACR.
 Change the <ACR_NAME> with the output from the step 6.1
+```bash
 az acr login --name <ACR_NAME>
+```
 
 ## 7. Unzipping the Dataset  
 The given dataset was provided in a compressed ZIP format. To extract it, we used the following command:  
@@ -141,7 +156,9 @@ m06sparkbasics/ <br/>
 Uploading data files to Azure Storage ensures that the necessary datasets are available for processing in the Spark ETL pipeline. The files stored in Azure Blob Storage serve as input for data transformation and enrichment operations.
 
 I.	Retrieve the storage account name:
-Command: terraform output storage_account_name
+```bash
+terraform output storage_account_name
+```
 
 II.	Upload files to the data container via Azure Portal.
 
@@ -156,7 +173,9 @@ I.	Create a Python Virtual Environment
 •	Activating it with source venv/bin/activate ensures that all dependencies are installed in the virtual environment rather than system-wide.
 
 II.	Activate python env
-•	source venv/bin/activate
+```bash
+source venv/bin/activate
+```
 
 III.	Install Dependencies
 •	pip install -r requirements.txt installs all required Python packages listed in requirements.txt.
@@ -212,11 +231,15 @@ The dataset is partitioned by wthr_year, wthr_month, wthr_day for efficient quer
 
 V.	Organise unit test cases code and Run UnitTests into folder src/tests/ 
 Adding  unit test cases source code to src/tests/ maintains a structured and modular project, making it easier to manage, test, and debug.
+Test cases :
 ![image](https://github.com/user-attachments/assets/b4106011-eb97-4e40-8af1-e1e1220b3859)
 
  
 VI.	Package Artifacts
-python3 setup.py bdist_egg creates a distributable .egg package of the project, which can be deployed or reused in other environments.
+```bash
+python3 setup.py bdist_egg
+```
+Creates a distributable .egg package of the project, which can be deployed or reused in other environments.
 This step ensures that the ETL job can be packaged and executed efficiently within Kubernetes or other environments.
 Output:
 ![image](https://github.com/user-attachments/assets/f6eab805-de19-4109-b09e-1432a053000d)
@@ -225,7 +248,9 @@ Output:
 VII.	Building the Docker Image on Windows
 Building Docker images ensures consistency, portability, and scalability of applications across environments. It encapsulates dependencies, making deployments reliable. Docker images enable efficient resource utilization, version control, and seamless scaling in Kubernetes or cloud platforms. This ensures smooth execution of your Spark ETL application across different systems.
 
-Command: docker build -t <ACR_NAME>/spark-python-06:latest -fdocker/Dockerfile docker/ --build-context extra-source=./(Replace the ACR_NAME with your actual value).
+```bash
+docker build -t <ACR_NAME>/spark-python-06:latest -fdocker/Dockerfile docker/ --build-context extra-source=./(Replace the ACR_NAME with your actual value).
+```
 This command ensures the image is built using the AMD64 (x86_64) architecture, which is compatible with cloud-based Kubernetes clusters.
 The --build-context extra-source=./ argument ensures all necessary files are included in the build process.
 Update the docker file with your actual directory locations.
@@ -237,40 +262,52 @@ Pushing a Docker image to Azure Container Registry (ACR) is essential for deploy
 
 •	Build the Docker Image
 Navigate to the directory where your Dockerfile is located and run the following command to build the image:
+```bash
 docker build -t acrdevwesteurope3vzr/park-python-06:latest -f docker/Dockerfile .
+```
 This command builds the image and tags it as park-python-06:latest
 ![image](https://github.com/user-attachments/assets/27cc2f23-25a2-4edd-95ba-c13b3d265c9f)
 
  
 •	Verify the Built Image
 Check if the image is built successfully by listing all Docker images:
-Command:docker images
+```bash
+docker images
+```
 Ensure the repository name and tag are correct.
 ![image](https://github.com/user-attachments/assets/b506d65f-fcdb-4dfa-9a6d-a67a6d09fa34)
 
  
 •	Login to Azure Container Registry (ACR)
 Before pushing the image, you need to authenticate with ACR:
-Command:docker login acrdevwesteurope3vzr.azurecr.io
+```bash
+docker login acrdevwesteurope3vzr.azurecr.io
+```
 When prompted, enter the username and password for ACR authentication
 ![image](https://github.com/user-attachments/assets/01df8659-3040-4f76-b088-eb5ef1456526)
 
  
 •	Tag the Image for ACR
 Docker needs the image tag to match the ACR repository format. Tag the built image correctly:
-Command: docker tag acrdevwesteurope3vzr/park-python-06:latest acrdevwesteurope3vzr.azurecr.io/park-python-06:latest
+```bash
+docker tag acrdevwesteurope3vzr/park-python-06:latest acrdevwesteurope3vzr.azurecr.io/park-python-06:latest
+```
 This renames the image with the ACR domain prefix.
 
 •	Push the Image to ACR
 Now, push the tagged image to Azure Container Registry:
-Command: docker push acrdevwesteurope3vzr.azurecr.io/park-python-06:latest
+```bash
+docker push acrdevwesteurope3vzr.azurecr.io/park-python-06:latest
+```
 This uploads the image to ACR, making it accessible for deployments.
 ![image](https://github.com/user-attachments/assets/456dc169-75d7-4f6f-8791-2ef9011db639)
 
  
 IX.	Verify the Image in ACR
 Check if the image is successfully pushed by listing repositories in ACR:
-Command: az acr repository list --name acrdevwesteurope3vzr --output table
+```bash
+az acr repository list --name acrdevwesteurope3vzr --output table
+```
 You should see park-python-06 in the list. 
 ![image](https://github.com/user-attachments/assets/37004592-96f5-40b6-93a4-40ccb4cd12c0)
 
@@ -280,14 +317,20 @@ Once your Azure Kubernetes Service (AKS) cluster is created, you need to configu
 
 I.	Initialize Terraform
 Before deploying AKS, Terraform needs to be initialized. This downloads the required providers and modules.
-Command:terraform init
-Command: terraform init -migrate-state
+```bash
+terraform init
+```
+```bash
+terraform init -migrate-state
+```
 ![image](https://github.com/user-attachments/assets/f5de679b-26d7-4538-b2c5-cdf71f6d67e5)
 
  
 II.	2: Apply Terraform Configuration
 Now, apply the Terraform configuration to provision resources in Azure.
-Command:terraform apply -auto-approve
+```bash
+terraform apply -auto-approve
+```
 Terraform will create the AKS cluster and required resources.
 ![image](https://github.com/user-attachments/assets/4e03ca79-8b56-4087-a9e3-49bf61c94392)
 
@@ -295,23 +338,31 @@ Terraform will create the AKS cluster and required resources.
 III.	Retrieve kubeconfig.yaml
 After the cluster is successfully provisioned, extract the kubeconfig.yaml file to authenticate with AKS.
 Terraform stores the AKS cluster credentials in its output. Run the following command to extract the kubeconfig.yaml file:
-Command: terraform output -raw aks_kubeconfig > kubeconfig.yaml
+```bash
+terraform output -raw aks_kubeconfig > kubeconfig.yaml
+```
 This command retrieves the AKS cluster's kubeconfig and saves it in the current directory as kubeconfig.yaml.
 
 IV.	Set kubeconfig.yaml as Default for kubectl
 To use kubectl with your newly created AKS cluster, set the kubeconfig file as the default for the current session.
-Command: $env:KUBECONFIG = "$(Get-Location)\kubeconfig.yaml"
+```bash
+$env:KUBECONFIG = "$(Get-Location)\kubeconfig.yaml"
+```
 This tells kubectl to use this specific kubeconfig file instead of the default one
 
 V.	Verify Kubernetes Cluster Connectivity
 Now, check if the Kubernetes nodes are up and running.
-Command: kubectl get nodes
+```bash
+kubectl get nodes
+```
 ![image](https://github.com/user-attachments/assets/c8754fea-c022-41a5-b758-f51763a9c222)
 
  
 VI.	List Running Pods (Optional)
 To ensure that all Kubernetes system pods are running properly, execute:
-Command: kubectl get pods -A
+```bash
+kubectl get pods -A
+```
 This command lists all pods across namespaces, including system pods required for AKS.   
 ![image](https://github.com/user-attachments/assets/a1ce6cdf-715a-4503-86f2-31dad6aca222)
 
@@ -323,14 +374,22 @@ This command lists all pods across namespaces, including system pods required fo
 
 I.	 Retrieve AKS API Server URL
 To connect Spark to AKS, you need the Kubernetes API Server URL. Run the following command inside your Terraform project directory (terraform/):
-Command: terraform output aks_api_server_url
+```bash
+terraform output aks_api_server_url
+```
 ![image](https://github.com/user-attachments/assets/ca1e91cd-f26d-4e38-9b98-8f0096ed487d)
-
  
 This Command Fetches the Kubernetes API Server URL, which is required to submit Spark jobs to AKS.
+
 II.	Configure and Submit Spark Job
 Now, update the placeholders in the spark-submit command and run it.
 ![image](https://github.com/user-attachments/assets/dfbe0b50-fe11-4f85-b8c1-340a5c1fee36)
+
+III.Verify the spark job
+```bash
+kubectl logs spark-driver-4522
+```
+![image](https://github.com/user-attachments/assets/7b70bebd-073e-48fa-973e-9d0cf6ed6a1a)
 
 
             
