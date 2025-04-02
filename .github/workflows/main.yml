@@ -28,7 +28,7 @@ jobs:
       - name: Run unit tests
         run: |
           pytest tests/ || echo "No tests found, skipping..."
-  
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -46,10 +46,14 @@ jobs:
           terraform_version: 'latest'
 
       - name: Initialize Terraform
-        run: terraform init
+        run: |
+          cd spoark_task/terraform  # Navigate to the correct directory
+          terraform init
 
       - name: Apply Terraform
-        run: terraform apply -auto-approve
+        run: |
+          cd spoark_task/terraform
+          terraform apply -auto-approve
 
       - name: Deploy Spark Job on Kubernetes
         run: |
@@ -58,6 +62,7 @@ jobs:
 
       - name: Clean up (optional)
         run: |
+          cd spoark_task/terraform
           terraform destroy -auto-approve
 
       - name: Send notification (optional)
