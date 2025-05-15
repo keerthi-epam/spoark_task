@@ -47,12 +47,12 @@ jobs:
 
       - name: Initialize Terraform
         run: |
-          cd spoark_task/terraform  # Navigate to the correct directory
+          cd spoark_task_new/m06_sparkbasics_python_azure/terraform  # Navigate to the correct directory
           terraform init
 
       - name: Apply Terraform
         run: |
-          cd spoark_task/terraform
+          cd spoark_task_new/m06_sparkbasics_python_azure/terraform
           terraform apply -auto-approve
 
       - name: Deploy Spark Job on Kubernetes
@@ -62,7 +62,7 @@ jobs:
 
       - name: Clean up (optional)
         run: |
-          cd spoark_task/terraform
+          cd spoark_task_new/m06_sparkbasics_python_azure/terraform
           terraform destroy -auto-approve
 
       - name: Send notification (optional)
